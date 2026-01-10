@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.4
-FROM ghcr.io/ublue-os/arch-toolbox AS bazzite-unraid-xfce
+FROM ghcr.io/ublue-os/arch-toolbox AS bazzite-unraid-wayland
 
 COPY system_files /
 
@@ -8,6 +8,8 @@ COPY system_files /
 # ============================================================
 # Steam/Lutris/Wine installed separately so they use the 
 # dependencies above and don't try to install their own.
+# Display server (X11/Wayland) and DE packages are separated
+# for easy switching between configurations.
 # ============================================================
 
 # Optimize pacman for parallel downloads
@@ -17,16 +19,12 @@ RUN sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
 RUN echo -e "\n[lizardbyte]\nSigLevel = Optional\nServer = https://github.com/LizardByte/pacman-repo/releases/latest/download" \
     >> /etc/pacman.conf
 
-# Package updates & installations
+# Package updates & base system
 RUN --mount=type=cache,target=/var/cache/pacman/pkg \
-    # Update mirrors for better download reliability \
-    pacman -Sy --noconfirm reflector && \
-    reflector --verbose --latest 10 --protocol https --sort rate --save /etc/pacman.d/mirrorlist && \
     # Update base packages \
     pacman -Syu --noconfirm && \
-    # Install additional packages \
+    # Install core build tools (needed for AUR and other builds) \
     pacman -S --noconfirm \
-        # Build tools (needed for AUR and other builds) \
         base-devel \
         git \
         wget \
@@ -36,10 +34,17 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
         fuse3 \
         fuse-common \
         fuse-overlayfs \
-        # Desktop integration
+        # Desktop integration (display-server agnostic) \
         xdg-utils \
         desktop-file-utils \
-        # Graphics drivers and libraries \
+        xdg-user-dirs && \
+    # Cleanup \
+    pacman -Scc --noconfirm && \
+    rm -rf /var/cache/pacman/pkg/*
+
+# Graphics drivers and libraries (display-server agnostic)
+RUN --mount=type=cache,target=/var/cache/pacman/pkg \
+    pacman -S --noconfirm \
         mesa \
         mesa-utils \
         vulkan-tools \
@@ -52,8 +57,14 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
         xf86-video-amdgpu \
         intel-media-driver \
         rocm-opencl-runtime \
-        rocm-hip-runtime \
-        # Audio stack \
+        rocm-hip-runtime && \
+    # Cleanup \
+    pacman -Scc --noconfirm && \
+    rm -rf /var/cache/pacman/pkg/*
+
+# Audio stack (display-server agnostic)
+RUN --mount=type=cache,target=/var/cache/pacman/pkg \
+    pacman -S --noconfirm \
         pipewire \
         pipewire-pulse \
         pipewire-alsa \
@@ -63,25 +74,14 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
         lib32-pipewire-jack \
         lib32-libpulse \
         openal \
-        lib32-openal \
-        # Desktop environment \
-        xfce4 \
-        xfce4-goodies \
-        xfconf \
-        # Desktop portal \
-        xdg-desktop-portal-kde \
-        xdg-user-dirs \
-        # X.org components \
-        xorg-server \
-        xorg-xinit \
-        xorg-xauth \
-        xorg-xhost \
-        xorg-xrandr \
-        xorg-xdpyinfo \
-        xorg-xwininfo \
-        xterm \
-        xdotool \
-        # System utilities \
+        lib32-openal && \
+    # Cleanup \
+    pacman -Scc --noconfirm && \
+    rm -rf /var/cache/pacman/pkg/*
+
+# System utilities (display-server agnostic)
+RUN --mount=type=cache,target=/var/cache/pacman/pkg \
+    pacman -S --noconfirm \
         dbus \
         wmctrl \
         vim \
@@ -102,7 +102,18 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
         # Fonts and locales \
         noto-fonts-cjk \
         glibc-locales && \
-    # Gaming applications (installed after dependencies) \
+    # Cleanup \
+    pacman -Scc --noconfirm && \
+    rm -rf /var/cache/pacman/pkg/*
+
+# ============================================================
+# GAMING APPLICATIONS, TOOLS, & UTILITIES
+# ============================================================
+# These packages work with both X11 and Wayland
+# gamescope prefers Wayland but supports X11
+# ============================================================
+
+RUN --mount=type=cache,target=/var/cache/pacman/pkg \
     pacman -S --noconfirm \
         steam \
         lutris \
@@ -110,15 +121,87 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
         mangohud \
         lib32-mangohud \
         gamescope && \
-    # Sunshine streaming server \
-    pacman -S --noconfirm lizardbyte/sunshine && \
-    # LatencyFleX installation \
-    wget https://raw.githubusercontent.com/Shringe/LatencyFleX-Installer/main/install.sh -O /usr/bin/latencyflex && \
-    sed -i 's@"dxvk.conf"@"/usr/share/latencyflex/dxvk.conf"@g' /usr/bin/latencyflex && \
-    chmod +x /usr/bin/latencyflex && \
     # Cleanup \
     pacman -Scc --noconfirm && \
     rm -rf /var/cache/pacman/pkg/*
+
+# Sunshine streaming server
+RUN --mount=type=cache,target=/var/cache/pacman/pkg \
+    pacman -S --noconfirm lizardbyte/sunshine && \
+    # Cleanup \
+    pacman -Scc --noconfirm && \
+    rm -rf /var/cache/pacman/pkg/*
+
+# LatencyFleX script and DXVK configuration tool
+RUN wget https://raw.githubusercontent.com/Shringe/LatencyFleX-Installer/main/install.sh -O /usr/bin/latencyflex && \
+    sed -i 's@"dxvk.conf"@"/usr/share/latencyflex/dxvk.conf"@g' /usr/bin/latencyflex && \
+    chmod +x /usr/bin/latencyflex
+
+# ============================================================
+# WAYLAND DISPLAY SERVER PACKAGES
+# ============================================================
+# Replace this section with Wayland packages when switching
+# to Wayland (e.g., wayland, wlroots, xwayland)
+# ============================================================
+
+RUN --mount=type=cache,target=/var/cache/pacman/pkg \
+    pacman -S --noconfirm \
+        wayland \
+        wayland-protocols \
+        wlroots \
+        xwayland \
+        seatd \
+        polkit \
+        polkit-kde-agent \
+        xdg-desktop-portal \
+        xdg-desktop-portal-hyprland \
+        xdg-desktop-portal-gtk \
+        qt5-wayland \
+        qt6-wayland && \
+    # Cleanup \
+    pacman -Scc --noconfirm && \
+    rm -rf /var/cache/pacman/pkg/*
+
+# ============================================================
+# HYPRLAND DESKTOP ENVIRONMENT
+# ============================================================
+# Replace this section with another DE (GNOME, KDE, etc.) or
+# compositor (Sway, Hyprland, etc.) when switching away from XFCE
+# ============================================================
+
+RUN --mount=type=cache,target=/var/cache/pacman/pkg \
+    pacman -S --noconfirm \
+        hyprland \
+        waybar \
+        wofi \
+        grim \
+        slurp \
+        mako \
+        foot && \
+    mkdir -p /etc/skel/.config/hypr && \
+    pacman -Scc --noconfirm && \
+    rm -rf /var/cache/pacman/pkg/* && \
+    # Configure default hyprland startup \
+    cat <<'EOF' > /etc/skel/.config/hypr/hyprland.conf
+$mod = SUPER
+
+exec-once = dbus-run-session waybar &
+exec-once = mako &
+exec-once = /usr/lib/polkit-kde-authentication-agent-1 &
+
+monitor = ,preferred,auto,1
+
+bind = $mod, RETURN, exec, foot
+bind = $mod, D, exec, wofi --show drun
+bind = $mod, Q, killactive
+bind = $mod, M, exit
+
+general {
+    gaps_in = 5
+    gaps_out = 10
+    border_size = 2
+}
+EOF
 
 # ============================================================
 # BUILD OPTIMIZATIONS FOR MULTI-CORE SYSTEM
@@ -203,9 +286,6 @@ RUN userdel -r build && \
 # Set Sunshine capabilities
 RUN setcap cap_sys_admin,cap_net_admin+ep /usr/bin/sunshine || true
 
-# Configure default XFCE startup
-RUN echo 'exec startxfce4' > /etc/skel/.xinitrc
-
 # Create environment variable injection hook
 RUN cat <<'EOF' > /etc/profile.d/bazzite-unraid-env.sh
 #!/bin/sh
@@ -243,4 +323,5 @@ RUN sed -i 's@ (Runtime)@@g' /usr/share/applications/steam.desktop && \
     rm -rf /tmp/* /var/cache/pacman/pkg/*
 
 # Note: Currently the sunshine.config must be configured to use X11 capture mode "capture = x11"
+# For Wayland: Use "capture = wlroots" or "capture = pipewire" depending on compositor
 # docker build --build-arg HOST_USER=$HOST_USER -t bazzite-unraid-xfce:latest .
