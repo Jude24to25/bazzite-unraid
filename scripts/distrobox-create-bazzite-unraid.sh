@@ -326,42 +326,6 @@ EOF_RUNTIME
 echo ""
 echo "✔ bazzite-unraid runtime setup complete"
 
-# # ============================================================
-# # AUTOMATIC PASSWORD SETTING INSIDE CONTAINER
-# # ============================================================
-# echo " "
-# echo "|****************************************************************"
-# read -rsp "Enter password for root inside container: " ROOT_PASS
-# echo
-# read -rsp "Enter password for $HOST_USER inside container: " USER_PASS
-# echo
-
-# # Run password setting as root directly
-# distrobox-enter "$CONTAINER_NAME" -- bash <<EOF_AUTOPASS
-# set -e
-# HOST_USER=\$(id -un)
-
-# # Unlock accounts if needed
-# sudo passwd -u root || true
-# sudo passwd -u \$HOST_USER || true
-
-# # Set root password
-# echo "${ROOT_PASS}" | sudo passwd --stdin root 2>/dev/null || echo "${ROOT_PASS}" | sudo passwd root --stdin 2>/dev/null || true
-
-# # Set $HOST_USER password
-# echo "${USER_PASS}" | sudo passwd --stdin \$HOST_USER 2>/dev/null || echo "${USER_PASS}" | sudo passwd \$HOST_USER --stdin 2>/dev/null || true
-
-# # Ensure passwordless sudo persists (run as root or with sudo)
-# echo "$HOST_USER ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/90-$HOST_USER-nopasswd >/dev/null
-# sudo chmod 0440 /etc/sudoers.d/90-$HOST_USER-nopasswd
-# EOF_AUTOPASS
-
-# # Clear sensitive variables from memory
-# unset USER_PASS
-# echo "✓ Unset in-memory root and $HOST_USER passwords"
-# echo "|****************************************************************"
-# echo " "
-
 echo "✔ You can now run Steam/XFCE/Sunshine as $HOST_USER inside the container"
 } 2>&1 | tee -a "$LOG_FILE"
 
