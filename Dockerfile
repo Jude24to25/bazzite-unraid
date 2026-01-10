@@ -169,8 +169,7 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
         pacman -S --noconfirm \
             wayland \
             wayland-protocols \
-            wlroots \
-            xwayland \
+            xorg-xwayland \
             seatd \
             polkit \
             polkit-kde-agent \
@@ -251,7 +250,7 @@ RUN mkdir -p /home/build/.cache && \
     echo "opt-level = 3" >> ~/.cargo/config.toml && \
     echo 'lto = "thin"' >> ~/.cargo/config.toml
 
-# Remove all paru packages robustly
+# Remove all pre-existing paru packages robustly and then rebuild paru
 RUN --mount=type=cache,target=/var/cache/pacman/pkg \
     --mount=type=cache,target=/home/build/.cache \
     sudo pacman -Rdd --noconfirm paru-bin paru-bin-debug 2>/dev/null || true && \
@@ -262,6 +261,7 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
     cd .. && \
     rm -rf paru
 
+# AUR installation with conditional Wayland packages
 RUN pacman -Q paru
 RUN --mount=type=cache,target=/var/cache/pacman/pkg \
     --mount=type=cache,target=/home/build/.cache/paru \
@@ -276,7 +276,10 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
         aur/lib32-gperftools \
         aur/steamcmd \
         aur/appimagelauncher \
-        aur/brave-bin
+        aur/brave-bin && \
+    if [ "$DISPLAY_STACK" = "wayland" ]; then \
+        paru -S --noconfirm aur/wlroots ; \
+    fi
 
 USER root
 WORKDIR /
