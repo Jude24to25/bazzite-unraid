@@ -12,7 +12,7 @@ COPY system_files /
 COPY settings /tmp/build
 
 # ========================================================================================================================
-# PACKAGE INSTALLATION
+# PACMAN OPTIMIZATION & MIRRORS
 # ------------------------------------------------------------------------------------------------------------------------
 # Steam/Lutris/Wine installed separately so they use the 
 # dependencies above and don't try to install their own.
@@ -20,8 +20,21 @@ COPY settings /tmp/build
 # for easy switching between configurations.
 # ------------------------------------------------------------------------------------------------------------------------
 
-# Optimize pacman for parallel downloads
-RUN sed -i 's/#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf
+RUN \
+    # Enable parallel downloads \
+    sed -i 's/^#ParallelDownloads = 5/ParallelDownloads = 10/' /etc/pacman.conf && \
+    # Bootstrap mirrors (avoid sync-db/mirror skew) \
+    printf '%s\n' \
+      'Server = https://mirror.rackspace.com/archlinux/$repo/os/$arch' \
+      'Server = https://mirror.osbeck.com/archlinux/$repo/os/$arch' \
+      'Server = https://arch.mirror.constant.com/archlinux/$repo/os/$arch' \
+      'Server = https://mirror.pkgbuild.com/archlinux/$repo/os/$arch' \
+      > /etc/pacman.d/mirrorlist && \
+    # Update keyring and install reflector \
+    pacman -Syy --noconfirm archlinux-keyring reflector --needed && \
+    # Regenerate mirrorlist with reflector \
+    reflector --latest 20 --protocol https --sort rate --save /etc/pacman.d/mirrorlist && \
+    pacman -Syy
 
 # Sunshine repository
 RUN echo -e "\n[lizardbyte]\nSigLevel = Optional\nServer = https://github.com/LizardByte/pacman-repo/releases/latest/download" \
@@ -164,7 +177,7 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
             xorg-xwininfo \
             xterm \
             xdotool \
-            xdg-desktop-portal-kde ; \
+            xdg-desktop-portal-gtk ; \
     elif [ "$DISPLAY_STACK" = "wayland" ]; then \
         pacman -S --noconfirm \
             wayland \
@@ -174,8 +187,8 @@ RUN --mount=type=cache,target=/var/cache/pacman/pkg \
             polkit \
             polkit-kde-agent \
             xdg-desktop-portal \
-            xdg-desktop-portal-hyprland \
             xdg-desktop-portal-gtk \
+            xdg-desktop-portal-hyprland \
             qt5-wayland \
             qt6-wayland ; \
     fi && \
